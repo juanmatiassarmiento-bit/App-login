@@ -35,6 +35,7 @@ export default function LoginScreen({ navigation }) {
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.screen}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <View style={styles.panel}>
         <View style={styles.brandLine}>
           <View style={styles.brandIcon}><Ionicons color={tema.colors.white} name="navigate" size={19} /></View>
           <Text style={styles.brand}>PUNTO SUR</Text>
@@ -71,6 +72,7 @@ export default function LoginScreen({ navigation }) {
           </View>
         </View>
         <Text style={styles.footer}>UN MAPA DE LUGARES QUE IMPORTAN</Text>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -79,6 +81,7 @@ export default function LoginScreen({ navigation }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: tema.colors.paper },
   scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 26, paddingVertical: 36 },
+  panel: { width: '100%', maxWidth: 460, alignSelf: 'center' },
   brandLine: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   brandIcon: { width: 36, height: 36, borderRadius: 8, backgroundColor: tema.colors.green, alignItems: 'center', justifyContent: 'center' },
   brand: { color: tema.colors.ink, fontSize: 12, fontWeight: '900', letterSpacing: 1.4 },

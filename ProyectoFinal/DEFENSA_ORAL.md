@@ -22,7 +22,7 @@ La sesión se guarda usando AsyncStorage como almacenamiento de Supabase. Al abr
 
 ## Mapa y lugares
 
-La pantalla Mapa usa `react-native-maps`, que permite probar el mapa directamente con Expo Go en Android o iOS. `expo-location` solicita permiso mientras la app está en uso y muestra la ubicación actual cuando se concede. El mapa abre con una vista general de Argentina. En el navegador se muestra una lista de estadios porque el componente del mapa es nativo.
+La pantalla Mapa usa `react-native-maps` en Android e iOS, y en la web monta un mapa interactivo con Leaflet y OpenStreetMap, por lo que funciona en cualquier celular y también en el navegador. `expo-location` solicita permiso mientras la app está en uso y muestra la ubicación actual cuando se concede. El mapa abre con una vista general de Argentina y, al agregar un estadio, vuela hasta sus coordenadas. La pantalla se adapta a celulares y pantallas grandes, y el asistente Suri funciona en todas las plataformas.
 
 Hay marcadores iniciales de estadios de Buenos Aires, Rosario, Santa Fe, Córdoba y Mendoza. Al tocar uno se abre un modal con el club, la ciudad y una descripción. El botón de agregar abre el mismo componente modal en modo formulario: pide nombre, descripción, latitud y longitud, así se puede marcar un estadio en cualquier lugar del mundo. La latitud debe estar entre -90 y 90, y la longitud entre -180 y 180. También permite elegir una foto. Al guardar, el mapa se centra en esas coordenadas y el nuevo marcador aparece en la lista. Los datos se conservan localmente con AsyncStorage.
 

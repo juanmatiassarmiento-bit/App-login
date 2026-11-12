@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "login-app",
+    "name": "Punto Sur",
     "slug": "snack-60491e23-6594-418c-bfc8-b3d2ac320aad",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
@@ -13,7 +13,11 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Punto Sur usa tu ubicación para mostrarte dónde estás en el mapa de estadios.",
+        "NSPhotoLibraryUsageDescription": "Punto Sur accede a tus fotos para que puedas ilustrar los estadios que guardás."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -23,7 +27,23 @@
       "edgeToEdgeEnabled": true
     },
     "web": {
-      "favicon": "./assets/favicon.png"
-    }
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Punto Sur usa tu ubicación para mostrarte dónde estás en el mapa de estadios."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Punto Sur accede a tus fotos para que puedas ilustrar los estadios que guardás."
+        }
+      ]
+    ]
   }
 }

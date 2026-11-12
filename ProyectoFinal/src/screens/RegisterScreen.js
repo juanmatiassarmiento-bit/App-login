@@ -41,6 +41,7 @@ export default function RegisterScreen({ navigation }) {
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.screen}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <View style={styles.panel}>
         <Pressable accessibilityRole="button" onPress={() => navigation.goBack()} style={styles.back}>
           <Text style={styles.backLabel}>‹  Volver</Text>
         </Pressable>
@@ -65,6 +66,7 @@ export default function RegisterScreen({ navigation }) {
             <Text style={styles.loginText}>Ya tengo cuenta · Iniciar sesión</Text>
           </Pressable>
         </View>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -73,6 +75,7 @@ export default function RegisterScreen({ navigation }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: tema.colors.paper },
   scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 25, paddingVertical: 24 },
+  panel: { width: '100%', maxWidth: 460, alignSelf: 'center' },
   back: { alignSelf: 'flex-start', marginBottom: 30, paddingVertical: 8, paddingRight: 12 },
   backLabel: { color: tema.colors.greenDark, fontSize: 14, fontWeight: '700' },
   eyebrow: { color: tema.colors.coral, fontSize: 11, fontWeight: '800', letterSpacing: 1 },

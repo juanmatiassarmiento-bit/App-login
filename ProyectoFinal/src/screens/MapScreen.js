@@ -1,59 +1,104 @@
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  FlatList,
+  Image,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
+import AssistantModal from '../components/AssistantModal';
 import CustomButton from '../components/CustomButton';
 import InputField from '../components/InputField';
 import Modal from '../components/Modal';
 import StadiumMap from '../components/StadiumMap';
+import { ESTADIOS_INICIALES } from '../data/estadios';
+import { resolverImagen } from '../utils/imagenes';
+import { IMAGEN_GENERICA_ESTADIO } from '../utils/imagenes';
 import tema from '../utils/tema';
 
 const STORAGE_KEY = '@punto-sur/estadios';
 const CENTRO_ARGENTINA = { latitude: -33.1, longitude: -63.7 };
-const BUENOS_AIRES = { latitude: -34.6037, longitude: -58.3816 };
-const ESTADIOS_INICIALES = [
-  { id: 'monumental', title: 'Mâs Monumental', club: 'River Plate', city: 'Núñez, Buenos Aires', description: 'La casa de River Plate, en el barrio de Núñez.', latitude: -34.5453, longitude: -58.4498, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Estadio_Monumental_Antonio_Vespucio_Liberti.jpg/640px-Estadio_Monumental_Antonio_Vespucio_Liberti.jpg' },
-  { id: 'bombonera', title: 'La Bombonera', club: 'Boca Juniors', city: 'La Boca, Buenos Aires', description: 'El estadio de Boca Juniors, en el barrio de La Boca.', latitude: -34.6357, longitude: -58.3647, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Estadio_Alberto_J._Armando.jpg/640px-Estadio_Alberto_J._Armando.jpg' },
-  { id: 'libertadores', title: 'Libertadores de América', club: 'Independiente', city: 'Avellaneda, Buenos Aires', description: 'El estadio de Independiente, en Avellaneda.', latitude: -34.6705, longitude: -58.3718, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/90/Libertadores_de_America_Independiente.jpg/640px-Libertadores_de_America_Independiente.jpg' },
-  { id: 'cilindro', title: 'El Cilindro', club: 'Racing Club', city: 'Avellaneda, Buenos Aires', description: 'El estadio Presidente Perón, casa de Racing Club.', latitude: -34.6671, longitude: -58.3683, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/Estadio_Presidente_Per%C3%B3n.jpg/640px-Estadio_Presidente_Per%C3%B3n.jpg' },
-  { id: 'nuevo-gasometro', title: 'Nuevo Gasómetro', club: 'San Lorenzo', city: 'Bajo Flores, Buenos Aires', description: 'El estadio Pedro Bidegain, donde juega San Lorenzo.', latitude: -34.6526, longitude: -58.4402, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Estadio_Pedro_Bidegain.jpg/640px-Estadio_Pedro_Bidegain.jpg' },
-  { id: 'gigante-arroyito', title: 'Gigante de Arroyito', club: 'Rosario Central', city: 'Rosario, Santa Fe', description: 'El estadio de Rosario Central, junto al río Paraná.', latitude: -32.9159, longitude: -60.6745, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Estadio_Gigante_de_Arroyito.jpg/640px-Estadio_Gigante_de_Arroyito.jpg' },
-  { id: 'coloso-parque', title: 'Coloso del Parque', club: "Newell's Old Boys", city: 'Rosario, Santa Fe', description: 'El estadio Marcelo Bielsa, casa de Newell’s Old Boys.', latitude: -32.9584, longitude: -60.6611, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/Estadio_Marcelo_Bielsa.JPG/640px-Estadio_Marcelo_Bielsa.JPG' },
-  { id: 'kempes', title: 'Mario Alberto Kempes', club: 'Estadio provincial', city: 'Córdoba, Córdoba', description: 'Uno de los principales estadios de la provincia de Córdoba.', latitude: -31.3699, longitude: -64.2467, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Estadio_Mario_Alberto_Kempes.jpg/640px-Estadio_Mario_Alberto_Kempes.jpg' },
-  { id: 'malvinas', title: 'Malvinas Argentinas', club: 'Estadio provincial', city: 'Mendoza, Mendoza', description: 'Estadio mendocino ubicado en el Parque General San Martín.', latitude: -32.8893, longitude: -68.8785, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Estadio_Malvinas_Argentinas.jpg/640px-Estadio_Malvinas_Argentinas.jpg' },
-  { id: '15-abril', title: '15 de Abril', club: 'Unión de Santa Fe', city: 'Santa Fe, Santa Fe', description: 'La cancha de Unión, en la ciudad de Santa Fe.', latitude: -31.6278, longitude: -60.7169, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Estadio_15_de_Abril.jpg/640px-Estadio_15_de_Abril.jpg' },
-  { id: 'brigadier-lopez', title: 'Brigadier López', club: 'Colón de Santa Fe', city: 'Santa Fe, Santa Fe', description: 'El estadio de Colón, conocido como el Cementerio de los Elefantes.', latitude: -31.6354, longitude: -60.7061, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/Estadio_Brigadier_General_Estanislao_L%C3%B3pez.jpg/640px-Estadio_Brigadier_General_Estanislao_L%C3%B3pez.jpg' },
-  { id: 'estadio-unico-la-plata', title: 'Estadio Único Diego Armando Maradona', club: 'Estadio provincial', city: 'La Plata, Buenos Aires', description: 'Estadio moderno de la ciudad de La Plata.', latitude: -34.9038, longitude: -57.9868, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/07/Estadio_Ciudad_de_La_Plata.jpg/640px-Estadio_Ciudad_de_La_Plata.jpg' },
-  { id: 'estadio-atletico-tucuman', title: 'Monumental José Fierro', club: 'Atlético Tucumán', city: 'San Miguel de Tucumán, Tucumán', description: 'El estadio de Atlético Tucumán.', latitude: -26.8115, longitude: -65.2015, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c9/Estadio_Monumental_Jos%C3%A9_Fierro.jpg/640px-Estadio_Monumental_Jos%C3%A9_Fierro.jpg' },
-  { id: 'estadio-talleres-cordoba', title: 'Mario Kempes (Talleres)', club: 'Talleres de Córdoba', city: 'Córdoba, Córdoba', description: 'Estadio donde juega Talleres de Córdoba.', latitude: -31.3699, longitude: -64.2467, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Estadio_Mario_Alberto_Kempes.jpg/640px-Estadio_Mario_Alberto_Kempes.jpg' },
-  { id: 'estadio-estudiantes-lp', title: 'Jorge Luis Hirschi', club: 'Estudiantes de La Plata', city: 'La Plata, Buenos Aires', description: 'El moderno estadio de Estudiantes de La Plata.', latitude: -34.9123, longitude: -57.9405, image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/Estadio_Jorge_Luis_Hirschi.jpg/640px-Estadio_Jorge_Luis_Hirschi.jpg' },
-];
 
-function crearMarcadores(lugares, onPress) {
-  const marcadores = [];
-  for (const lugar of lugares) {
-    marcadores.push({
-      id: lugar.id,
-      title: lugar.title,
-      description: lugar.club ? `${lugar.club} · ${lugar.city}` : lugar.description,
-      lugar,
-      latitude: lugar.latitude,
-      longitude: lugar.longitude,
-      onPress: () => onPress(lugar),
+async function leerUbicacion() {
+  if (Platform.OS === 'web') {
+    return new Promise((resolve, reject) => {
+      if (typeof navigator === 'undefined' || !navigator.geolocation) {
+        reject(new Error('Geolocalización no disponible'));
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => resolve({ latitude: coords.latitude, longitude: coords.longitude }),
+        () => reject(new Error('Permiso denegado')),
+        { enableHighAccuracy: false, timeout: 12000, maximumAge: 60000 },
+      );
     });
   }
-  return marcadores;
+
+  const permiso = await Location.requestForegroundPermissionsAsync();
+  if (!permiso.granted) throw new Error('Permiso denegado');
+  const actual = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+  return { latitude: actual.coords.latitude, longitude: actual.coords.longitude };
+}
+
+function migrarGuardados(guardados) {
+  return guardados.map((item) => {
+    const base = ESTADIOS_INICIALES.find((estadio) => estadio.id === item.id);
+    // Un pin es "manual" si lo marcamos así o si su id no corresponde al catálogo
+    // (cubre los guardados antes de que existiera la bandera).
+    const manual = Boolean(item.manual) || !base;
+    if (base && typeof item.image === 'string' && /^https?:/i.test(item.image)) {
+      return { ...item, image: base.image, manual };
+    }
+    return { ...item, manual };
+  });
+}
+
+function Buscador({ valor, onChange, compacto }) {
+  return (
+    <View style={[styles.search, compacto && styles.searchCompact]}>
+      <Ionicons color={tema.colors.muted} name="search-outline" size={17} />
+      <TextInput
+        accessibilityLabel="Buscar estadio"
+        autoCorrect={false}
+        onChangeText={onChange}
+        placeholder="Buscar club, ciudad o estadio"
+        placeholderTextColor="#93A099"
+        style={styles.searchInput}
+        value={valor}
+      />
+      {valor ? (
+        <Pressable accessibilityLabel="Borrar búsqueda" accessibilityRole="button" onPress={() => onChange('')} style={styles.searchClear}>
+          <Ionicons color={tema.colors.muted} name="close-circle" size={17} />
+        </Pressable>
+      ) : null}
+    </View>
+  );
 }
 
 export default function MapScreen() {
+  const { width } = useWindowDimensions();
+  const wide = width >= 900;
+
   const [lugares, setLugares] = useState(ESTADIOS_INICIALES);
   const [ubicacion, setUbicacion] = useState(null);
-  const [estadoPermiso, setEstadoPermiso] = useState('pending');
+  const [estadoPermiso, setEstadoPermiso] = useState(Platform.OS === 'web' ? 'idle' : 'pending');
   const [mensaje, setMensaje] = useState('');
   const [modal, setModal] = useState('');
+  const [pendienteEliminar, setPendienteEliminar] = useState(null);
+  const [asistenteAbierto, setAsistenteAbierto] = useState(false);
   const [lugarSeleccionado, setLugarSeleccionado] = useState(null);
+  const [busqueda, setBusqueda] = useState('');
   const [titulo, setTitulo] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [latitudTexto, setLatitudTexto] = useState('');
@@ -63,70 +108,116 @@ export default function MapScreen() {
   const [centroMapa, setCentroMapa] = useState(CENTRO_ARGENTINA);
   const [zoomMapa, setZoomMapa] = useState(5);
   const [revisionMapa, setRevisionMapa] = useState(0);
+  const toastTimer = useRef(null);
+
+  // Animaciones del FAB y del toast
+  const pulso = useRef(new Animated.Value(0)).current;
+  const entrada = useRef(new Animated.Value(0)).current;
+  const toastAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    let active = true;
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((saved) => {
-        if (!active || !saved) return;
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) setLugares(parsed);
-      })
-      .catch(() => {
-        if (active) setMensaje('No se pudieron cargar los puntos guardados.');
-      });
+    Animated.spring(entrada, { toValue: 1, friction: 5, useNativeDriver: true }).start();
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulso, { toValue: 1, duration: 1300, useNativeDriver: true }),
+        Animated.timing(pulso, { toValue: 0, duration: 1300, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [entrada, pulso]);
 
-    const obtainLocation = async () => {
-      try {
-        const permission = await Location.requestForegroundPermissionsAsync();
-        if (!active) return;
-        setEstadoPermiso(permission.granted ? 'granted' : 'denied');
-        if (!permission.granted) {
-          setMensaje('Activa el permiso para mostrar tu ubicación en el mapa.');
-          return;
-        }
-        const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        if (active) setUbicacion(current.coords);
-      } catch {
-        if (active) setMensaje('No se pudo obtener la ubicación del dispositivo.');
-      }
-    };
+  useEffect(() => {
+    if (!mensaje) return;
+    toastAnim.setValue(0);
+    Animated.timing(toastAnim, { toValue: 1, duration: 220, useNativeDriver: true }).start();
+  }, [mensaje, toastAnim]);
 
-    obtainLocation();
-    return () => { active = false; };
+  const mostrarToast = useCallback((texto) => {
+    setMensaje(texto);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setMensaje(''), 4500);
   }, []);
 
-  const requestLocation = async () => {
+  useEffect(() => () => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+  }, []);
+
+  useEffect(() => {
+    let activo = true;
+    AsyncStorage.getItem(STORAGE_KEY)
+      .then((guardado) => {
+        if (!activo || !guardado) return;
+        const parseado = JSON.parse(guardado);
+        if (Array.isArray(parseado) && parseado.length) {
+          setLugares(migrarGuardados(parseado));
+        }
+      })
+      .catch(() => {
+        if (activo) mostrarToast('No pudimos cargar los puntos guardados.');
+      });
+
+    return () => {
+      activo = false;
+    };
+  }, [mostrarToast]);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return undefined;
+    let activo = true;
+
+    (async () => {
+      try {
+        const permiso = await Location.requestForegroundPermissionsAsync();
+        if (!activo) return;
+        if (!permiso.granted) {
+          setEstadoPermiso('denied');
+          return;
+        }
+        setEstadoPermiso('granted');
+        const actual = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        if (activo) setUbicacion({ latitude: actual.coords.latitude, longitude: actual.coords.longitude });
+      } catch {
+        if (activo) setEstadoPermiso('denied');
+      }
+    })();
+
+    return () => {
+      activo = false;
+    };
+  }, []);
+
+  const requestLocation = useCallback(async () => {
     try {
-      const permission = await Location.requestForegroundPermissionsAsync();
-      setEstadoPermiso(permission.granted ? 'granted' : 'denied');
-      if (!permission.granted) {
-        setMensaje('El permiso de ubicación no fue concedido. Puedes cambiarlo en ajustes.');
+      setEstadoPermiso('pending');
+      const coords = await leerUbicacion();
+      setUbicacion(coords);
+      setEstadoPermiso('granted');
+      setCentroMapa(coords);
+      setZoomMapa(14);
+      setRevisionMapa((revision) => revision + 1);
+      mostrarToast('Ubicación lista. El mapa se centró en tu posición.');
+    } catch {
+      setEstadoPermiso('denied');
+      mostrarToast('No pudimos acceder a tu ubicación. Revisá los permisos del navegador o del celular.');
+    }
+  }, [mostrarToast]);
+
+  const chooseImage = useCallback(async () => {
+    try {
+      const permiso = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permiso.granted) {
+        Alert.alert('Permiso necesario', 'Permití el acceso a tus fotos para adjuntar una imagen.');
         return;
       }
-      const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      setUbicacion(current.coords);
-      setMensaje('');
+      const resultado = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.85 });
+      if (!resultado.canceled && resultado.assets.length) setImagen(resultado.assets[0].uri);
     } catch {
-      setMensaje('No se pudo obtener la ubicación actual.');
+      Alert.alert('No pudimos abrir la galería', 'Intentá nuevamente en unos segundos.');
     }
-  };
+  }, []);
 
-  const chooseImage = async () => {
-    try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert('Permiso necesario', 'Permite acceder a tus fotos para adjuntar una imagen.');
-        return;
-      }
-      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.85 });
-      if (!result.canceled && result.assets.length > 0) setImagen(result.assets[0].uri);
-    } catch {
-      Alert.alert('No se pudo abrir la galería', 'Inténtalo nuevamente.');
-    }
-  };
-
-  const openNewPlace = () => {
+  const openNewPlace = useCallback(() => {
     setTitulo('');
     setDescripcion('');
     setLatitudTexto(ubicacion ? String(ubicacion.latitude) : '');
@@ -135,11 +226,11 @@ export default function MapScreen() {
     setErrorFormulario('');
     setLugarSeleccionado(null);
     setModal('new');
-  };
+  }, [ubicacion]);
 
-  const savePlace = async () => {
+  const savePlace = useCallback(async () => {
     if (!titulo.trim() || !descripcion.trim() || !latitudTexto.trim() || !longitudTexto.trim()) {
-      setErrorFormulario('Completa el nombre, la descripción, la latitud y la longitud.');
+      setErrorFormulario('Completá el nombre, la descripción, la latitud y la longitud.');
       return;
     }
     const latitude = Number(latitudTexto);
@@ -152,121 +243,448 @@ export default function MapScreen() {
       setErrorFormulario('La longitud debe ser un número entre -180 y 180.');
       return;
     }
+
     const nuevoLugar = {
       id: `lugar-${Date.now()}`,
       title: titulo.trim(),
       description: descripcion.trim(),
       image: imagen,
+      manual: true, // pin agregado por el usuario: se pinta en otro color
       latitude,
       longitude,
     };
     const nuevosLugares = [nuevoLugar, ...lugares];
     setLugares(nuevosLugares);
+    setBusqueda('');
     setCentroMapa({ latitude, longitude });
-    setZoomMapa(14);
+    setZoomMapa(15);
     setRevisionMapa((revision) => revision + 1);
     setModal('');
-    setMensaje('Punto guardado en tu mapa.');
+    mostrarToast('Estadio guardado. Ya aparece en tu mapa.');
+
     try {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(nuevosLugares));
     } catch {
-      setMensaje('El punto aparece en el mapa, pero no se pudo guardar en el dispositivo.');
+      mostrarToast('El punto aparece en el mapa, pero no pudimos guardarlo en este dispositivo.');
     }
-  };
+  }, [descripcion, imagen, latitudTexto, longitudTexto, lugares, mostrarToast, titulo]);
 
-  const openDetails = (lugar) => {
+  const openDetails = useCallback((lugar) => {
     setLugarSeleccionado(lugar);
     setModal('details');
-  };
+  }, []);
 
-  const nativeMarkers = crearMarcadores(lugares, openDetails);
+  const manejarPresionLarga = useCallback(({ latitude, longitude }) => {
+    // ¿El punto cae sobre un pin existente? (~300 m de tolerancia)
+    const cerca = lugaresFiltrados.find(
+      (lugar) => Math.abs(lugar.latitude - latitude) < 0.003 && Math.abs(lugar.longitude - longitude) < 0.003,
+    );
+    if (cerca) {
+      setPendienteEliminar(cerca);
+      return;
+    }
+    setTitulo('');
+    setDescripcion('');
+    setImagen('');
+    setErrorFormulario('');
+    setLugarSeleccionado(null);
+    setLatitudTexto(latitude.toFixed(5));
+    setLongitudTexto(longitude.toFixed(5));
+    setModal('new');
+  }, [lugaresFiltrados]);
+
+  const eliminarLugar = useCallback(async () => {
+    const lugar = pendienteEliminar;
+    if (!lugar) return;
+    const restantes = lugares.filter((item) => item.id !== lugar.id);
+    setLugares(restantes);
+    setPendienteEliminar(null);
+    mostrarToast(`${lugar.title} se quitó del mapa.`);
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(restantes));
+    } catch {
+      mostrarToast('No se pudo guardar el cambio en este dispositivo.');
+    }
+  }, [lugares, pendienteEliminar, mostrarToast]);
+
+  const centrarEnMapa = useCallback((lugar) => {
+    if (!lugar) return;
+    setCentroMapa({ latitude: lugar.latitude, longitude: lugar.longitude });
+    setZoomMapa(15);
+    setRevisionMapa((revision) => revision + 1);
+    setModal('');
+    mostrarToast(`Mapa centrado en ${lugar.title}.`);
+  }, [mostrarToast]);
+
+  const lugaresFiltrados = useMemo(() => {
+    const consulta = busqueda.trim().toLowerCase();
+    if (!consulta) return lugares;
+    return lugares.filter((lugar) => {
+      const texto = [lugar.title, lugar.club, lugar.city, lugar.description]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return texto.includes(consulta);
+    });
+  }, [busqueda, lugares]);
+
+  const marcadores = useMemo(
+    () =>
+      lugaresFiltrados.map((lugar) => ({
+        id: lugar.id,
+        title: lugar.title,
+        description: lugar.club ? `${lugar.club} · ${lugar.city}` : lugar.description,
+        lugar,
+        latitude: lugar.latitude,
+        longitude: lugar.longitude,
+      })),
+    [lugaresFiltrados],
+  );
+
+  const esInicial = ESTADIOS_INICIALES.some((estadio) => estadio.id === lugarSeleccionado?.id);
 
   return (
-    <View style={styles.screen}>
-      <View style={styles.topbar}>
-        <View style={styles.headingCopy}>
-          <Text style={styles.eyebrow}>ARGENTINA · CLUBES Y CANCHAS</Text>
-          <Text style={styles.heading}>Estadios de fútbol</Text>
+    <View style={[styles.screen, wide && styles.screenWide]}>
+      <View style={styles.header}>
+        <View style={styles.brandMark}>
+          <Ionicons color={tema.colors.white} name="football" size={19} />
         </View>
-        <Pressable accessibilityLabel="Agregar un estadio" accessibilityRole="button" onPress={openNewPlace} style={styles.addButton}>
-          <Ionicons color={tema.colors.white} name="add" size={25} />
-        </Pressable>
+        <View style={styles.headingCopy}>
+          <Text numberOfLines={1} style={styles.eyebrow}>PUNTO SUR · MAPA DE CLUBES</Text>
+          <Text numberOfLines={1} style={[styles.heading, wide && styles.headingWide]}>Estadios de fútbol</Text>
+        </View>
+        <View style={styles.headerActions}>
+          <Pressable
+            accessibilityLabel="Agregar un estadio"
+            accessibilityRole="button"
+            onPress={openNewPlace}
+            style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
+          >
+            <Ionicons color={tema.colors.white} name="add" size={24} />
+          </Pressable>
+        </View>
       </View>
 
-      {mensaje ? <Text accessibilityRole="alert" style={styles.message}>{mensaje}</Text> : null}
-      {estadoPermiso !== 'granted' ? (
-        <Pressable accessibilityRole="button" onPress={requestLocation} style={styles.permissionRow}>
-          <Ionicons color={tema.colors.greenDark} name="navigate-outline" size={17} />
-          <Text style={styles.permissionText}>Permitir ubicación actual</Text>
-          <Ionicons color={tema.colors.greenDark} name="arrow-forward" size={15} />
-        </Pressable>
-      ) : null}
+      <View style={[styles.body, wide && styles.bodyWide]}>
+        <View style={[styles.mapColumn, wide && styles.mapColumnWide]}>
+          <View style={styles.mapFrame}>
+            <StadiumMap
+              center={centroMapa}
+              markers={marcadores}
+              onLongPress={manejarPresionLarga}
+              onMarkerPress={openDetails}
+              revision={revisionMapa}
+              showUserLocation={estadoPermiso === 'granted'}
+              userLocation={ubicacion}
+              zoom={zoomMapa}
+            />
 
-      <View style={styles.mapFrame}>
-        <StadiumMap
-          center={centroMapa}
-          markers={nativeMarkers}
-          onMarkerPress={openDetails}
-          revision={revisionMapa}
-          showUserLocation={estadoPermiso === 'granted'}
-          zoom={zoomMapa}
-        />
-        {estadoPermiso === 'pending' ? (
-          <View style={styles.loadingBadge}><ActivityIndicator color={tema.colors.green} /><Text style={styles.loadingText}>Buscando ubicación</Text></View>
+            <View pointerEvents="box-none" style={styles.mapOverlay}>
+              <View style={styles.mapTopRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={requestLocation}
+                  style={({ pressed }) => [
+                    styles.mapPill,
+                    estadoPermiso === 'granted' && styles.mapPillActive,
+                    pressed && styles.mapPillPressed,
+                  ]}
+                >
+                  {estadoPermiso === 'pending' ? (
+                    <ActivityIndicator color={tema.colors.greenDark} size="small" />
+                  ) : (
+                    <Ionicons
+                      color={estadoPermiso === 'granted' ? tema.colors.white : tema.colors.greenDark}
+                      name={estadoPermiso === 'granted' ? 'navigate' : 'navigate-outline'}
+                      size={14}
+                    />
+                  )}
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.mapPillText, estadoPermiso === 'granted' && styles.mapPillTextActive]}
+                  >
+                    {estadoPermiso === 'pending'
+                      ? 'Ubicando…'
+                      : estadoPermiso === 'granted'
+                        ? 'Mi ubicación'
+                        : 'Activar ubicación'}
+                  </Text>
+                </Pressable>
+
+                <View style={styles.mapPill}>
+                  <Ionicons color={tema.colors.coral} name="location" size={14} />
+                  <Text style={styles.mapPillText}>
+                    {lugaresFiltrados.length} {lugaresFiltrados.length === 1 ? 'estadio' : 'estadios'}
+                  </Text>
+                </View>
+              </View>
+
+              {Platform.OS !== 'web' ? (
+                <View style={styles.mapHint}>
+                  <Ionicons color={tema.colors.greenDark} name="hand-left-outline" size={13} />
+                  <Text style={styles.mapHintText}>Tocá un marcador para ver su ficha</Text>
+                </View>
+              ) : null}
+            </View>
+
+            {mensaje ? (
+              <Animated.View
+                style={[
+                  styles.toast,
+                  Platform.OS === 'web' && styles.toastWeb,
+                  {
+                    opacity: toastAnim,
+                    transform: [{ translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }],
+                  },
+                ]}
+              >
+                <Ionicons color={tema.colors.greenDark} name="information-circle" size={17} />
+                <Text style={styles.toastText}>{mensaje}</Text>
+              </Animated.View>
+            ) : null}
+          </View>
+        </View>
+
+        {wide ? (
+          <View style={styles.aside}>
+            <View style={styles.asideHead}>
+              <View style={styles.asideTitleRow}>
+                <Text style={styles.asideTitle}>Estadios</Text>
+                <View style={styles.countBadge}>
+                  <Text style={styles.countBadgeText}>{lugaresFiltrados.length}</Text>
+                </View>
+              </View>
+              <Text style={styles.asideSubtitle}>Elegí una cancha para abrir su ficha.</Text>
+            </View>
+
+            <Buscador onChange={setBusqueda} valor={busqueda} />
+
+            <FlatList
+              contentContainerStyle={styles.asideList}
+              data={lugaresFiltrados}
+              keyExtractor={(item) => item.id}
+              ListEmptyComponent={
+                <View style={styles.empty}>
+                  <Ionicons color={tema.colors.muted} name="search-outline" size={22} />
+                  <Text style={styles.emptyText}>No encontramos estadios para “{busqueda}”.</Text>
+                </View>
+              }
+              renderItem={({ item }) => (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => openDetails(item)}
+                  style={({ pressed }) => [styles.cardWide, pressed && styles.cardPressed]}
+                >
+                  {item.image ? (
+                    <Image source={resolverImagen(item.image)} style={styles.cardWideImage} />
+                  ) : (
+                    <View style={[styles.cardWideImage, styles.cardImageEmpty]}>
+                      <Ionicons color={tema.colors.green} name="football" size={22} />
+                    </View>
+                  )}
+                  <View style={styles.cardBody}>
+                    <Text numberOfLines={1} style={styles.cardTitle}>{item.title}</Text>
+                    <Text numberOfLines={1} style={styles.cardMeta}>
+                      {item.club ? `${item.club} · ${item.city}` : 'Agregado por vos'}
+                    </Text>
+                    <View style={styles.cardCoordsRow}>
+                      <Ionicons color={tema.colors.green} name="location-outline" size={11} />
+                      <Text style={styles.cardCoords}>
+                        {item.latitude.toFixed(3)}, {item.longitude.toFixed(3)}
+                      </Text>
+                    </View>
+                  </View>
+                  <Ionicons color={tema.colors.lineDark} name="chevron-forward" size={17} />
+                </Pressable>
+              )}
+              showsVerticalScrollIndicator={false}
+              style={styles.asideListWrap}
+            />
+
+            <View style={styles.promo}>
+              <View style={styles.promoOrb} />
+              <View style={styles.promoAvatar}>
+                <Ionicons color={tema.colors.gold} name="sparkles" size={18} />
+              </View>
+              <View style={styles.promoCopy}>
+                <Text style={styles.promoTitle}>¿No sabés cuál elegir?</Text>
+                <Text style={styles.promoText}>Suri te recomienda un estadio en segundos.</Text>
+              </View>
+              <Pressable
+                accessibilityLabel="Hablar con Suri"
+                accessibilityRole="button"
+                onPress={() => setAsistenteAbierto(true)}
+                style={({ pressed }) => [styles.promoButton, pressed && styles.promoButtonPressed]}
+              >
+                <Ionicons color={tema.colors.greenDark} name="arrow-forward" size={17} />
+              </Pressable>
+            </View>
+          </View>
         ) : null}
       </View>
 
-      <View style={styles.listHeading}>
-        <Text style={styles.listTitle}>Estadios en el mapa</Text>
-        <Text style={styles.listCount}>{lugares.length}</Text>
-      </View>
-      <FlatList
-        contentContainerStyle={styles.listContent}
-        data={lugares}
-        horizontal
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <Pressable accessibilityRole="button" onPress={() => openDetails(item)} style={styles.placeChip}>
-            <View style={styles.pin}><Ionicons color={tema.colors.green} name="location" size={14} /></View>
-            <Text numberOfLines={1} style={styles.placeName}>{item.title}</Text>
-          </Pressable>
-        )}
-        showsHorizontalScrollIndicator={false}
-      />
+      {!wide ? (
+        <View style={styles.mobileList}>
+          <Buscador compacto onChange={setBusqueda} valor={busqueda} />
+          <FlatList
+            contentContainerStyle={styles.mobileCards}
+            data={lugaresFiltrados}
+            horizontal
+            keyExtractor={(item) => item.id}
+            ListEmptyComponent={
+              <View style={styles.emptyMobile}>
+                <Ionicons color={tema.colors.muted} name="search-outline" size={20} />
+                <Text style={styles.emptyText}>Sin resultados para “{busqueda}”.</Text>
+              </View>
+            }
+            renderItem={({ item }) => (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => openDetails(item)}
+                style={({ pressed }) => [styles.cardMobile, pressed && styles.cardPressed]}
+              >
+                {item.image ? (
+                  <Image source={resolverImagen(item.image)} style={styles.cardMobileImage} />
+                ) : (
+                  <View style={[styles.cardMobileImage, styles.cardImageEmpty]}>
+                    <Ionicons color={tema.colors.green} name="football" size={24} />
+                  </View>
+                )}
+                <View style={styles.cardMobileBody}>
+                  <Text numberOfLines={1} style={styles.cardTitle}>{item.title}</Text>
+                  <Text numberOfLines={1} style={styles.cardMeta}>
+                    {item.club ? `${item.club} · ${item.city}` : 'Agregado por vos'}
+                  </Text>
+                  <View style={styles.cardCoordsRow}>
+                    <Ionicons color={tema.colors.green} name="location-outline" size={11} />
+                    <Text numberOfLines={1} style={styles.cardCoords}>
+                      {item.latitude.toFixed(3)}, {item.longitude.toFixed(3)}
+                    </Text>
+                  </View>
+                </View>
+              </Pressable>
+            )}
+            showsHorizontalScrollIndicator={false}
+          />
+        </View>
+      ) : null}
 
-      <View style={styles.aiButtonContainer}>
+      <Animated.View
+        style={[styles.fabShell, wide ? styles.fabWide : styles.fabMobile, { transform: [{ scale: entrada }] }]}
+      >
+        <Animated.View
+          style={[
+            styles.fabRing,
+            {
+              opacity: pulso.interpolate({ inputRange: [0, 1], outputRange: [0.5, 0] }),
+              transform: [{ scale: pulso.interpolate({ inputRange: [0, 1], outputRange: [1, 1.55] }) }],
+            },
+          ]}
+        />
         <Pressable
-          style={styles.aiButton}
-          onPress={() => {
-            console.log("Botón presionado");
-            Alert.alert(
-              'Asistente de Punto Sur',
-              'Esta aplicación es tu guía personal para explorar estadios de fútbol en Argentina.\n\n• Explora el mapa para ver canchas icónicas.\n• Agrega tus propios lugares favoritos.\n• Sube fotos y detalles personales.\n• Gestiona tu propia colección de estadios visitados.'
-            );
-          }}
+          accessibilityLabel="Abrir asistente Suri"
+          accessibilityRole="button"
+          onPress={() => setAsistenteAbierto(true)}
+          style={({ pressed }) => [styles.fabCore, pressed && styles.fabPressed]}
         >
-          <Ionicons color={tema.colors.white} name="sparkles" size={24} />
+          <View style={styles.fabOrb} />
+          <Ionicons color={tema.colors.gold} name="sparkles" size={25} />
         </Pressable>
-      </View>
+      </Animated.View>
 
       <Modal
-        footer={modal === 'new' ? <>
-          <CustomButton onPress={savePlace} title="Guardar punto" />
-          <CustomButton onPress={() => setModal('')} title="Cancelar" variant="quiet" />
-        </> : null}
+        footer={
+          modal === 'new' ? (
+            <>
+              <CustomButton
+                icon={<Ionicons color={tema.colors.white} name="checkmark-circle-outline" size={18} />}
+                onPress={savePlace}
+                title="Guardar estadio"
+              />
+              <CustomButton onPress={() => setModal('')} title="Cancelar" variant="quiet" />
+            </>
+          ) : modal === 'details' ? (
+            <>
+              <CustomButton
+                icon={<Ionicons color={tema.colors.white} name="locate-outline" size={18} />}
+                onPress={() => centrarEnMapa(lugarSeleccionado)}
+                title="Ver en el mapa"
+              />
+              <CustomButton
+                onPress={() => {
+                  const lugar = lugarSeleccionado;
+                  setModal('');
+                  setPendienteEliminar(lugar);
+                }}
+                title="Quitar del mapa"
+                variant="quiet"
+              />
+            </>
+          ) : null
+        }
+        icon={
+          <Ionicons
+            color={tema.colors.greenDark}
+            name={modal === 'new' ? 'add-circle-outline' : 'football-outline'}
+            size={22}
+          />
+        }
         onClose={() => setModal('')}
+        subtitle={modal === 'new' ? 'Sumá una cancha a tu colección' : lugarSeleccionado?.club || 'Ficha del estadio'}
         title={modal === 'new' ? 'Nuevo estadio' : lugarSeleccionado?.title || 'Detalle del estadio'}
         visible={modal !== ''}
       >
         {modal === 'new' ? (
           <>
-            <Text style={styles.modalHint}>Ingresa las coordenadas del estadio en cualquier lugar del mundo. Si hay permiso, se completan con tu posición actual.</Text>
-            {errorFormulario ? <Text accessibilityRole="alert" style={styles.formError}>{errorFormulario}</Text> : null}
-            <InputField label="Nombre del estadio" onChangeText={(value) => { setTitulo(value); setErrorFormulario(''); }} placeholder="Ej. Estadio de mi club" value={titulo} />
-            <InputField label="Descripción" multiline onChangeText={(value) => { setDescripcion(value); setErrorFormulario(''); }} placeholder="Club, ciudad y algún dato del estadio" value={descripcion} />
+            <View style={styles.formHint}>
+              <Ionicons color={tema.colors.greenDark} name="location-outline" size={16} />
+              <Text style={styles.formHintText}>
+                Mantené apretado el mapa para soltar un pin en ese punto, o ingresá las coordenadas manualmente.
+              </Text>
+            </View>
+            {errorFormulario ? (
+              <Text accessibilityRole="alert" style={styles.formError}>{errorFormulario}</Text>
+            ) : null}
+            <InputField
+              label="Nombre del estadio"
+              onChangeText={(value) => {
+                setTitulo(value);
+                setErrorFormulario('');
+              }}
+              placeholder="Ej. Estadio de mi club"
+              value={titulo}
+            />
+            <InputField
+              label="Descripción"
+              multiline
+              onChangeText={(value) => {
+                setDescripcion(value);
+                setErrorFormulario('');
+              }}
+              placeholder="Club, ciudad y algún dato del estadio"
+              value={descripcion}
+            />
             <View style={styles.coordinatesRow}>
-              <InputField label="Latitud" onChangeText={(value) => { setLatitudTexto(value); setErrorFormulario(''); }} placeholder="-34.6037" style={styles.coordinateField} value={latitudTexto} />
-              <InputField label="Longitud" onChangeText={(value) => { setLongitudTexto(value); setErrorFormulario(''); }} placeholder="-58.3816" style={styles.coordinateField} value={longitudTexto} />
+              <InputField
+                label="Latitud"
+                onChangeText={(value) => {
+                  setLatitudTexto(value);
+                  setErrorFormulario('');
+                }}
+                placeholder="-34.6037"
+                style={styles.coordinateField}
+                value={latitudTexto}
+              />
+              <InputField
+                label="Longitud"
+                onChangeText={(value) => {
+                  setLongitudTexto(value);
+                  setErrorFormulario('');
+                }}
+                placeholder="-58.3816"
+                style={styles.coordinateField}
+                value={longitudTexto}
+              />
             </View>
             <CustomButton
               icon={<Ionicons color={tema.colors.greenDark} name="image-outline" size={18} />}
@@ -278,65 +696,687 @@ export default function MapScreen() {
           </>
         ) : (
           <>
-            {lugarSeleccionado?.image ? <Image resizeMode="cover" source={{ uri: lugarSeleccionado.image }} style={styles.detailImage} /> : null}
-            {lugarSeleccionado?.club ? <Text style={styles.clubName}>{lugarSeleccionado.club}</Text> : null}
-            {lugarSeleccionado?.city ? <Text style={styles.cityName}>{lugarSeleccionado.city}</Text> : null}
+            <Image
+              resizeMode="cover"
+              source={lugarSeleccionado?.image ? resolverImagen(lugarSeleccionado.image) : { uri: IMAGEN_GENERICA_ESTADIO }}
+              style={styles.detailImage}
+            />
+
+            <View style={styles.detailBadges}>
+              <View style={styles.detailBadge}>
+                <Ionicons color={tema.colors.greenDark} name={lugarSeleccionado?.club ? 'shield-outline' : 'bookmark-outline'} size={13} />
+                <Text numberOfLines={1} style={styles.detailBadgeText}>
+                  {lugarSeleccionado?.club || 'Mi colección'}
+                </Text>
+              </View>
+              {lugarSeleccionado?.city ? (
+                <View style={[styles.detailBadge, styles.detailBadgeQuiet]}>
+                  <Ionicons color={tema.colors.coral} name="location-outline" size={13} />
+                  <Text numberOfLines={1} style={styles.detailBadgeQuietText}>{lugarSeleccionado.city}</Text>
+                </View>
+              ) : null}
+            </View>
+
             <Text style={styles.detailDescription}>{lugarSeleccionado?.description}</Text>
-            <Text style={styles.coordinates}>LAT {lugarSeleccionado?.latitude.toFixed(4)}  ·  LNG {lugarSeleccionado?.longitude.toFixed(4)}</Text>
+
+            <View style={styles.coordPanel}>
+              <View style={styles.coordItem}>
+                <Text style={styles.coordLabel}>LATITUD</Text>
+                <Text style={styles.coordValue}>{lugarSeleccionado?.latitude.toFixed(4)}</Text>
+              </View>
+              <View style={styles.coordDivider} />
+              <View style={styles.coordItem}>
+                <Text style={styles.coordLabel}>LONGITUD</Text>
+                <Text style={styles.coordValue}>{lugarSeleccionado?.longitude.toFixed(4)}</Text>
+              </View>
+            </View>
+
+            <Text style={styles.detailCredit}>
+              {esInicial ? 'Foto: Wikimedia Commons · Punto Sur' : 'Agregado por vos a tu colección'}
+            </Text>
           </>
         )}
       </Modal>
+
+      <Modal
+        footer={
+          <>
+            <CustomButton
+              icon={<Ionicons color={tema.colors.white} name="trash-outline" size={18} />}
+              onPress={eliminarLugar}
+              title="Quitar del mapa"
+            />
+            <CustomButton onPress={() => setPendienteEliminar(null)} title="Cancelar" variant="quiet" />
+          </>
+        }
+        icon={<Ionicons color={tema.colors.error} name="trash-outline" size={22} />}
+        onClose={() => setPendienteEliminar(null)}
+        subtitle="Se saca el punto de tu mapa"
+        title={`¿Quitar ${pendienteEliminar?.title || 'este pin'}?`}
+        visible={!!pendienteEliminar}
+      >
+        <Text style={styles.deleteText}>
+          Podés volver a crearlo cuando quieras manteniendo apretado el mapa en ese punto.
+        </Text>
+      </Modal>
+
+      <AssistantModal
+        lugares={lugares}
+        onClose={() => setAsistenteAbierto(false)}
+        onVerEstadio={openDetails}
+        visible={asistenteAbierto}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: tema.colors.paper, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
-  topbar: { minHeight: 63, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  headingCopy: { flex: 1 },
-  eyebrow: { color: tema.colors.coral, fontSize: 9, fontWeight: '800', letterSpacing: 0.7 },
-  heading: { marginTop: 4, color: tema.colors.ink, fontSize: 22, fontWeight: '800' },
-  addButton: { width: 44, height: 44, borderRadius: 8, backgroundColor: tema.colors.green, alignItems: 'center', justifyContent: 'center' },
-  message: { marginBottom: 7, color: tema.colors.muted, fontSize: 12 },
-  permissionRow: { minHeight: 39, marginBottom: 8, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 7, backgroundColor: tema.colors.mint },
-  permissionText: { flex: 1, color: tema.colors.greenDark, fontSize: 12, fontWeight: '700' },
-  mapFrame: { flex: 1, minHeight: 250, overflow: 'hidden', borderRadius: 9, borderWidth: 1, borderColor: tema.colors.line, backgroundColor: '#E8ECE5' },
-  loadingBadge: { position: 'absolute', top: 10, left: 10, paddingHorizontal: 10, paddingVertical: 7, flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 6, backgroundColor: tema.colors.white },
-  loadingText: { color: tema.colors.ink, fontSize: 11, fontWeight: '700' },
-  listHeading: { height: 41, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  listTitle: { color: tema.colors.ink, fontSize: 13, fontWeight: '800' },
-  listCount: { color: tema.colors.muted, fontSize: 12 },
-  listContent: { gap: 8, paddingBottom: 4 },
-  placeChip: { maxWidth: 190, minHeight: 37, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 7, borderWidth: 1, borderColor: tema.colors.line, backgroundColor: tema.colors.white },
-  pin: { width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
-  placeName: { flexShrink: 1, color: tema.colors.ink, fontSize: 12, fontWeight: '700' },
-  modalHint: { marginBottom: 17, color: tema.colors.muted, fontSize: 13, lineHeight: 19 },
-  formError: { marginBottom: 12, color: tema.colors.error, fontSize: 13, lineHeight: 18 },
-  coordinatesRow: { flexDirection: 'row', gap: 12 },
-  coordinateField: { flex: 1 },
-  preview: { width: '100%', height: 170, marginTop: 13, borderRadius: 8 },
-  detailImage: { width: '100%', height: 195, marginBottom: 16, borderRadius: 8 },
-  clubName: { color: tema.colors.greenDark, fontSize: 13, fontWeight: '800' },
-  cityName: { marginTop: 4, marginBottom: 12, color: tema.colors.muted, fontSize: 12 },
-  detailDescription: { color: tema.colors.ink, fontSize: 15, lineHeight: 23 },
-  coordinates: { marginTop: 20, color: tema.colors.muted, fontSize: 11, fontWeight: '700' },
-  aiButtonContainer: {
-    position: 'absolute',
-    bottom: 80,
-    right: 20,
-    zIndex: 9999,
-    elevation: 20,
+  screen: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+    backgroundColor: tema.colors.paper,
   },
-  aiButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: tema.colors.greenDark,
+  screenWide: {
+    paddingHorizontal: 26,
+    paddingTop: 18,
+    paddingBottom: 18,
+  },
+  header: {
+    minHeight: 58,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  brandMark: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
+    backgroundColor: tema.colors.green,
+    shadowColor: tema.colors.greenDark,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
+    shadowOpacity: 0.24,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  headingCopy: {
+    flex: 1,
+  },
+  eyebrow: {
+    color: tema.colors.coral,
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.9,
+  },
+  heading: {
+    marginTop: 3,
+    color: tema.colors.ink,
+    fontSize: 21,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+  },
+  headingWide: {
+    fontSize: 27,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  fabShell: {
+    position: 'absolute',
+    width: 58,
+    height: 58,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 50,
+  },
+  fabMobile: {
+    right: 16,
+    bottom: 178,
+  },
+  fabWide: {
+    right: 26,
+    bottom: 26,
+  },
+  fabRing: {
+    position: 'absolute',
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    borderWidth: 2,
+    borderColor: tema.colors.gold,
+  },
+  fabCore: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: tema.colors.greenDark,
+    overflow: 'hidden',
+    shadowColor: '#08140F',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    elevation: 10,
+  },
+  fabPressed: {
+    transform: [{ scale: 0.94 }],
+  },
+  fabOrb: {
+    position: 'absolute',
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    top: -46,
+    right: -26,
+    backgroundColor: 'rgba(226, 174, 85, 0.16)',
+  },
+  addButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: tema.colors.green,
+  },
+  addButtonPressed: {
+    backgroundColor: tema.colors.greenDark,
+  },
+  body: {
+    flex: 1,
+  },
+  bodyWide: {
+    flexDirection: 'row',
+    gap: 20,
+  },
+  mapColumn: {
+    flex: 1,
+  },
+  mapColumnWide: {
+    flex: 1,
+  },
+  mapFrame: {
+    flex: 1,
+    minHeight: 250,
+    overflow: 'hidden',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: tema.colors.lineDark,
+    backgroundColor: tema.colors.mapBg,
+    shadowColor: '#10231C',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.14,
+    shadowRadius: 22,
+    elevation: 5,
+  },
+  mapOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    padding: 12,
+    justifyContent: 'space-between',
+  },
+  mapTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  mapPill: {
+    minHeight: 34,
+    paddingHorizontal: 11,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: 'rgba(221, 226, 218, 0.9)',
+    backgroundColor: 'rgba(255, 255, 255, 0.94)',
+    shadowColor: '#10231C',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  mapPillActive: {
+    backgroundColor: tema.colors.green,
+    borderColor: tema.colors.green,
+  },
+  mapPillPressed: {
+    opacity: 0.82,
+  },
+  mapPillText: {
+    color: tema.colors.ink,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  mapPillTextActive: {
+    color: tema.colors.white,
+  },
+  mapHint: {
+    alignSelf: 'flex-start',
+    minHeight: 28,
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  },
+  mapHintText: {
+    color: tema.colors.greenDark,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  toast: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    bottom: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.97)',
+    borderWidth: 1,
+    borderColor: tema.colors.line,
+    shadowColor: '#10231C',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  toastWeb: {
+    bottom: 54,
+  },
+  toastText: {
+    flex: 1,
+    color: tema.colors.inkSoft,
+    fontSize: 11.5,
+    lineHeight: 16,
+    fontWeight: '600',
+  },
+  aside: {
+    width: 356,
+    padding: 16,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: tema.colors.line,
+    backgroundColor: tema.colors.cream,
+  },
+  asideHead: {
+    marginBottom: 12,
+  },
+  asideTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  asideTitle: {
+    color: tema.colors.ink,
+    fontSize: 19,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  countBadge: {
+    minWidth: 24,
+    height: 21,
+    paddingHorizontal: 7,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: tema.colors.mint,
+  },
+  countBadgeText: {
+    color: tema.colors.greenDark,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  asideSubtitle: {
+    marginTop: 4,
+    color: tema.colors.muted,
+    fontSize: 12,
+  },
+  search: {
+    minHeight: 46,
+    marginBottom: 12,
+    paddingHorizontal: 13,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: tema.colors.lineDark,
+    backgroundColor: tema.colors.white,
+  },
+  searchCompact: {
+    minHeight: 42,
+    marginBottom: 10,
+  },
+  searchInput: {
+    flex: 1,
+    minHeight: 40,
+    paddingVertical: 0,
+    color: tema.colors.ink,
+    fontSize: 13,
+  },
+  searchClear: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  asideListWrap: {
+    flex: 1,
+  },
+  asideList: {
+    gap: 9,
+    paddingBottom: 12,
+  },
+  cardWide: {
+    minHeight: 82,
+    padding: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: tema.colors.line,
+    backgroundColor: tema.colors.white,
+  },
+  cardWideImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 11,
+  },
+  cardPressed: {
+    opacity: 0.82,
+    borderColor: tema.colors.mintDark,
+  },
+  cardBody: {
+    flex: 1,
+  },
+  cardTitle: {
+    color: tema.colors.ink,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  cardMeta: {
+    marginTop: 3,
+    color: tema.colors.muted,
+    fontSize: 10.5,
+  },
+  cardCoordsRow: {
+    marginTop: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  cardCoords: {
+    flexShrink: 1,
+    color: tema.colors.greenDark,
+    fontSize: 9.5,
+    fontWeight: '700',
+  },
+  cardImageEmpty: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: tema.colors.mint,
+  },
+  empty: {
+    padding: 18,
+    alignItems: 'center',
+    gap: 7,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: tema.colors.lineDark,
+  },
+  emptyMobile: {
+    width: 300,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: tema.colors.lineDark,
+  },
+  emptyText: {
+    color: tema.colors.muted,
+    fontSize: 11.5,
+    textAlign: 'center',
+  },
+  promo: {
+    marginTop: 12,
+    padding: 13,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 16,
+    backgroundColor: tema.colors.greenDark,
+    overflow: 'hidden',
+  },
+  promoOrb: {
+    position: 'absolute',
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    right: -38,
+    top: -54,
+    backgroundColor: 'rgba(226, 174, 85, 0.16)',
+  },
+  promoAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  promoCopy: {
+    flex: 1,
+  },
+  promoTitle: {
+    color: tema.colors.white,
+    fontSize: 12.5,
+    fontWeight: '800',
+  },
+  promoText: {
+    marginTop: 2,
+    color: 'rgba(255, 255, 255, 0.72)',
+    fontSize: 10.5,
+    lineHeight: 15,
+  },
+  promoButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: tema.colors.gold,
+  },
+  promoButtonPressed: {
+    opacity: 0.82,
+  },
+  mobileList: {
+    paddingTop: 10,
+  },
+  mobileCards: {
+    gap: 10,
+    paddingBottom: 2,
+  },
+  cardMobile: {
+    width: 234,
+    padding: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: tema.colors.line,
+    backgroundColor: tema.colors.white,
+    shadowColor: '#10231C',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  cardMobileImage: {
+    width: 70,
+    height: 72,
+    borderRadius: 12,
+  },
+  cardMobileBody: {
+    flex: 1,
+    paddingVertical: 2,
+  },
+  formHint: {
+    marginBottom: 16,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    borderRadius: 12,
+    backgroundColor: tema.colors.mint,
+  },
+  formHintText: {
+    flex: 1,
+    color: tema.colors.greenDark,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '600',
+  },
+  formError: {
+    marginBottom: 13,
+    padding: 10,
+    borderRadius: 9,
+    backgroundColor: '#F8E5E2',
+    color: tema.colors.error,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '600',
+  },
+  coordinatesRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  coordinateField: {
+    flex: 1,
+  },
+  preview: {
+    width: '100%',
+    height: 180,
+    marginTop: 13,
+    borderRadius: 13,
+    backgroundColor: tema.colors.mint,
+  },
+  detailImage: {
+    width: '100%',
+    height: 208,
+    marginBottom: 15,
+    borderRadius: 15,
+    backgroundColor: tema.colors.mint,
+  },
+  detailImageEmpty: {
+    height: 132,
+    marginBottom: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: tema.colors.lineDark,
+    backgroundColor: tema.colors.mint,
+  },
+  detailImageEmptyText: {
+    color: tema.colors.greenDark,
+    fontSize: 11.5,
+    fontWeight: '600',
+  },
+  detailBadges: {
+    marginBottom: 13,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 7,
+  },
+  detailBadge: {
+    maxWidth: '100%',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: 9,
+    backgroundColor: tema.colors.mint,
+  },
+  detailBadgeText: {
+    flexShrink: 1,
+    color: tema.colors.greenDark,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  detailBadgeQuiet: {
+    backgroundColor: tema.colors.coralSoft,
+  },
+  detailBadgeQuietText: {
+    flexShrink: 1,
+    color: tema.colors.coral,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  detailDescription: {
+    color: tema.colors.ink,
+    fontSize: 14.5,
+    lineHeight: 22,
+  },
+  coordPanel: {
+    marginTop: 18,
+    padding: 13,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 13,
+    backgroundColor: tema.colors.cream,
+    borderWidth: 1,
+    borderColor: tema.colors.line,
+  },
+  coordItem: {
+    flex: 1,
+  },
+  coordLabel: {
+    color: tema.colors.muted,
+    fontSize: 8.5,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  coordValue: {
+    marginTop: 4,
+    color: tema.colors.greenDark,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  coordDivider: {
+    width: 1,
+    height: 28,
+    marginHorizontal: 12,
+    backgroundColor: tema.colors.line,
+  },
+  detailCredit: {
+    marginTop: 14,
+    color: tema.colors.muted,
+    fontSize: 9.5,
+  },
+  deleteText: {
+    color: tema.colors.inkSoft,
+    fontSize: 13.5,
+    lineHeight: 20,
   },
 });
